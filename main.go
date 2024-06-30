@@ -13,12 +13,14 @@ import (
 
 const DebugEnv string = "ECS_ENERGYCOSTSCRAPER_DEBUG"
 
-// TODO: env var
-const EnergyCostSiteUrl string = "https://www.acea.it/tariffe-indici"
+const EnergyCostSiteUrlEnv string = "ECS_ENERGYCOSTSCRAPER_SITEURL"
+const EnergyCostSiteUrlDefault string = "https://www.acea.it/tariffe-indici"
 
-// TODO: env vars
-const PunTableFullXpath string = "/html/body/div[2]/div[2]/section[3]/div/div/div/div[2]/div[2]/div/div[1]/div/div[2]/div/div/div/div/div/div/div[2]/table/tbody"
-const PsvTableFullXpath string = "/html/body/div[2]/div[2]/section[3]/div/div/div/div[2]/div[2]/div/div[2]/div/div[2]/div/div/div/div/div/div/div/table/tbody"
+const EnergyCostPunXpathEnv string = "ECS_ENERGYCOSTSCRAPER_PUN_XPATH"
+const PunTableFullXpathDefault string = "/html/body/div[2]/div[2]/section[3]/div/div/div/div[2]/div[2]/div/div[1]/div/div[2]/div/div/div/div/div/div/div[2]/table/tbody"
+
+const EnergyCostPsvXpathEnv string = "ECS_ENERGYCOSTSCRAPER_PSV_XPATH"
+const PsvTableFullXpathDefault string = "/html/body/div[2]/div[2]/section[3]/div/div/div/div[2]/div[2]/div/div[2]/div/div[2]/div/div/div/div/div/div/div/table/tbody"
 
 type EnergyCostEntryType int
 
@@ -46,9 +48,9 @@ var month2Number = map[string]int{"gen": 1, "feb": 2, "mar": 3, "apr": 4, "mag":
 
 func main() {
 
-	fmt.Println("Loading URL: ", EnergyCostSiteUrl)
+	fmt.Println("Loading URL: ", getEnv(EnergyCostSiteUrlEnv, EnergyCostSiteUrlDefault))
 
-	htmldoc, err := htmlquery.LoadURL(EnergyCostSiteUrl)
+	htmldoc, err := htmlquery.LoadURL(getEnv(EnergyCostSiteUrlEnv, EnergyCostSiteUrlDefault))
 	if err != nil {
 		panic(err)
 	}
@@ -64,9 +66,9 @@ func scrapeEnergyCost(htmldoc *html.Node, energyCostEntryType EnergyCostEntryTyp
 	var tableFullXPath string
 
 	if energyCostEntryType == EnergyCostEntryType_PUN {
-		tableFullXPath = PunTableFullXpath
+		tableFullXPath = getEnv(EnergyCostPunXpathEnv, PunTableFullXpathDefault)
 	} else if energyCostEntryType == EnergyCostEntryType_PSV {
-		tableFullXPath = PsvTableFullXpath
+		tableFullXPath = getEnv(EnergyCostPsvXpathEnv, PsvTableFullXpathDefault)
 	}
 
 	costEntries := scrapeEnergyCostEntries(htmldoc, tableFullXPath)
@@ -167,4 +169,11 @@ func isEnvGreaterThan(key string, val int64) bool {
 	}
 
 	return false
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }
