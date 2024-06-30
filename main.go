@@ -20,10 +20,22 @@ const EnergyCostSiteUrl string = "https://www.acea.it/tariffe-indici"
 const PunTableFullXpath string = "/html/body/div[2]/div[2]/section[3]/div/div/div/div[2]/div[2]/div/div[1]/div/div[2]/div/div/div/div/div/div/div[2]/table/tbody"
 const PsvTableFullXpath string = "/html/body/div[2]/div[2]/section[3]/div/div/div/div[2]/div[2]/div/div[2]/div/div[2]/div/div/div/div/div/div/div/table/tbody"
 
+type EnergyCostEntryType int
+
 const (
-	EnergyCostEntryType_PUN = iota
-	EnergyCostEntryType_PSV
+	EnergyCostEntryType_PUN EnergyCostEntryType = 1
+	EnergyCostEntryType_PSV EnergyCostEntryType = 2
 )
+
+func (s EnergyCostEntryType) String() string {
+	switch s {
+	case 1:
+		return "pun"
+	case 2:
+		return "psv"
+	}
+	return "unknown"
+}
 
 type energyCostEntry struct {
 	date time.Time
@@ -48,7 +60,7 @@ func main() {
 	scrapeEnergyCost(htmldoc, EnergyCostEntryType_PSV)
 }
 
-func scrapeEnergyCost(htmldoc *html.Node, energyCostEntryType int) ([]energyCostEntry, time.Time) {
+func scrapeEnergyCost(htmldoc *html.Node, energyCostEntryType EnergyCostEntryType) ([]energyCostEntry, time.Time) {
 	var tableFullXPath string
 
 	if energyCostEntryType == EnergyCostEntryType_PUN {
@@ -62,25 +74,18 @@ func scrapeEnergyCost(htmldoc *html.Node, energyCostEntryType int) ([]energyCost
 	var t time.Time
 	var err error
 
-	if energyCostEntryType == EnergyCostEntryType_PUN {
-		t, err = maxPunTimeSelect()
-		if err != nil {
-			fmt.Printf("Not able to retrieve the latest energy cost entry from PUN: %v\n", err)
-		}
-	} else if energyCostEntryType == EnergyCostEntryType_PSV {
-		t, err = maxPsvTimeSelect()
-		if err != nil {
-			fmt.Printf("Not able to retrieve the latest energy cost entry from PSV: %v\n", err)
-		}
+	t, err = maxTimeSelect(energyCostEntryType)
+	if err != nil {
+		fmt.Printf("Not able to retrieve the latest energy cost entry from %s: %v\n", energyCostEntryType.String(), err)
+	}
+
+	if isEnvGreaterThan(DebugEnv, 1000) {
+		fmt.Printf("[main.go:scrapeEnergyCost] max time found %v\n", t)
 	}
 
 	for _, ce := range costEntries {
 		if ce.date.After(t) {
-			if energyCostEntryType == EnergyCostEntryType_PUN {
-				punEntryInsert(t, ce.cost)
-			} else if energyCostEntryType == EnergyCostEntryType_PSV {
-				psvEntryInsert(t, ce.cost)
-			}
+			costEntryInsert(energyCostEntryType, ce.date, ce.cost)
 		}
 	}
 
@@ -145,5 +150,15 @@ func isEnv(key string) bool {
 	if _, ok := os.LookupEnv(key); ok {
 		return true
 	}
+	return false
+}
+
+func isEnvGreaterThan(key string, val int64) bool {
+	if v, ok := os.LookupEnv(key); ok {
+		intval, _ := strconv.ParseInt(string(v), 10, 64)
+
+		return intval > val
+	}
+
 	return false
 }

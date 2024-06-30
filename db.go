@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -20,74 +21,55 @@ var db *sql.DB
 var punEntryInsertStmt *sql.Stmt
 var psvEntryInsertStmt *sql.Stmt
 
-const createPunTable string = `
-	CREATE TABLE IF NOT EXISTS pun (
-		id SERIAL PRIMARY KEY,
-		time UNIQUE NOT NULL,
+const createTableTemplate string = `
+	CREATE TABLE IF NOT EXISTS ${TABLENAME} (
+		id SERIAL,
+		time timestamp UNIQUE NOT NULL,
 		cost float NOT NULL,
 		PRIMARY KEY (id)
   );
-  	CREATE INDEX pun_time_idx ON pun(time);
-  `
+  	CREATE INDEX IF NOT EXISTS ${TABLENAME}_time_idx ON ${TABLENAME}(time);
+`
 
-const selectMaxPunTime string = "SELECT max(time) FROM pun ;"
+const selectLastEnergyCostTimeTemplate string = "SELECT max(time) FROM ${TABLENAME} HAVING max(time) IS NOT NULL;"
 
-const createPsvTable string = `
-	CREATE TABLE IF NOT EXISTS psv (
-		id SERIAL PRIMARY KEY,
-		time UNIQUE NOT NULL,
-		cost float NOT NULL,
-		PRIMARY KEY (id)
-  );
-  	CREATE INDEX psv_time_idx ON psv(time);
-  `
+const insertEnergyCostTemplate string = "INSERT into ${TABLENAME}(time, cost) VALUES ($1, $2);"
 
-const selectMaxPsvTime string = "SELECT max(time) FROM psv ;"
+func costEntryInsert(costType EnergyCostEntryType, time time.Time, cost float64) error {
+	if isEnvGreaterThan(DebugEnv, 1000) {
+		fmt.Printf("[db.go:costEntryInsert] inserting cost entry type[%s] date[%v] cost[%v]\n", costType.String(), time, cost)
+	}
 
-func punEntryInsert(time time.Time, cost float64) error {
-	_, err := punEntryInsertStmt.Exec(
+	var entryInsertStmt *sql.Stmt
+
+	if costType == EnergyCostEntryType_PUN {
+		entryInsertStmt = punEntryInsertStmt
+	} else if costType == EnergyCostEntryType_PSV {
+		entryInsertStmt = psvEntryInsertStmt
+	}
+
+	_, err := entryInsertStmt.Exec(
 		time,
 		cost)
 	if err != nil {
-		fmt.Printf("DB error: %v\n", err)
+		fmt.Printf("[db.go:costEntryInsert] DB error: %v\n", err)
 	}
 
 	return err
 }
 
-func maxPunTimeSelect() (time.Time, error) {
-	var t time.Time = time.Date(1970, time.January, 1, 0, 0, 0, 0, time.Local) // in this way the first time the table is created all the cost entries are created and a time is always returned
-	err := db.QueryRow(selectMaxPunTime).Scan(&t)
-	if err == sql.ErrNoRows {
-		return t, nil
-	} else {
+func maxTimeSelect(costType EnergyCostEntryType) (time.Time, error) {
+	// in this way the first time the table is created all the cost entries are created and a time is always returned
+	var t time.Time = time.Date(1970, time.January, 1, 0, 0, 0, 0, time.Local)
+
+	err := db.QueryRow(strings.Replace(selectLastEnergyCostTimeTemplate, "${TABLENAME}", costType.String(), -1)).Scan(&t)
+	if err != nil && err != sql.ErrNoRows {
 		fmt.Printf("DB error: %v\n", err)
 
 		return t, err
 	}
-}
 
-func psvEntryInsert(time time.Time, cost float64) error {
-	_, err := psvEntryInsertStmt.Exec(
-		time,
-		cost)
-	if err != nil {
-		fmt.Printf("DB error: %v\n", err)
-	}
-
-	return err
-}
-
-func maxPsvTimeSelect() (time.Time, error) {
-	var t time.Time = time.Date(1970, time.January, 1, 0, 0, 0, 0, time.Local) // in this way the first time the table is created all the cost entries are created and a time is always returned
-	err := db.QueryRow(selectMaxPsvTime).Scan(&t)
-	if err == sql.ErrNoRows {
-		return t, nil
-	} else {
-		fmt.Printf("DB error: %v\n", err)
-
-		return t, err
-	}
+	return t, nil // max or the default time is returned
 }
 
 // called when the class is loaded
@@ -116,23 +98,24 @@ func init() {
 		fmt.Printf("Unable to ping DB: %v\n", err)
 	}
 
-	punEntryInsertStmt, err = db.Prepare("INSERT into pun(time, cost) VALUES ($1, $2);")
+	punEntryInsertStmt, err = db.Prepare(strings.Replace(insertEnergyCostTemplate, "${TABLENAME}", "pun", -1))
 	if err != nil {
 		fmt.Printf("Unable to create prepared stmt: %v\n", err)
 	}
 
-	psvEntryInsertStmt, err = db.Prepare("INSERT into psv(time, cost) VALUES ($1, $2);")
+	psvEntryInsertStmt, err = db.Prepare(strings.Replace(insertEnergyCostTemplate, "${TABLENAME}", "psv", -1))
 	if err != nil {
 		fmt.Printf("Unable to create prepared stmt: %v\n", err)
 	}
 
 	fmt.Printf("Initializing db tables ...\n")
-	_, err = db.Exec(createPunTable)
+
+	_, err = db.Exec(strings.Replace(createTableTemplate, "${TABLENAME}", "pun", -1))
 	if err != nil {
 		fmt.Printf("Unable to create [pun] table: %v\n", err)
 	}
 
-	_, err = db.Exec(createPsvTable)
+	_, err = db.Exec(strings.Replace(createTableTemplate, "${TABLENAME}", "psv", -1))
 	if err != nil {
 		fmt.Printf("Unable to create [psv] table: %v\n", err)
 	}
