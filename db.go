@@ -77,7 +77,7 @@ func init() {
 	// Connect to postgresql
 	var err error
 
-	dburl := os.Getenv(DbUrlEnv) + "?sslmode=require;application_name=energy-cost-scraper"
+	dburl := os.Getenv(DbUrlEnv) + "?sslmode=require&application_name=energy-cost-scraper"
 
 	u, err := url.Parse(dburl)
 	if err != nil {
