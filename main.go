@@ -80,13 +80,19 @@ func scrapeEnergyCost(htmldoc *html.Node, energyCostEntryType EnergyCostEntryTyp
 	}
 
 	if isEnvGreaterThan(DebugEnv, 1000) {
-		fmt.Printf("[main.go:scrapeEnergyCost] max time found %v\n", t)
+		fmt.Printf("[main.go:scrapeEnergyCost] latest cost entry found: %v\n", t)
 	}
 
+	var newEntriesFound = false
 	for _, ce := range costEntries {
 		if ce.date.After(t) {
+			newEntriesFound = true
 			costEntryInsert(energyCostEntryType, ce.date, ce.cost)
 		}
+	}
+
+	if !newEntriesFound {
+		fmt.Printf("[main.go:scrapeEnergyCost] no new cost entries found\n")
 	}
 
 	return costEntries, t
