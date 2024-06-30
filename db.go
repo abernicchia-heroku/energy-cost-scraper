@@ -98,16 +98,6 @@ func init() {
 		fmt.Printf("Unable to ping DB: %v\n", err)
 	}
 
-	punEntryInsertStmt, err = db.Prepare(strings.Replace(insertEnergyCostTemplate, "${TABLENAME}", "pun", -1))
-	if err != nil {
-		fmt.Printf("Unable to create prepared stmt: %v\n", err)
-	}
-
-	psvEntryInsertStmt, err = db.Prepare(strings.Replace(insertEnergyCostTemplate, "${TABLENAME}", "psv", -1))
-	if err != nil {
-		fmt.Printf("Unable to create prepared stmt: %v\n", err)
-	}
-
 	fmt.Printf("Initializing db tables ...\n")
 
 	_, err = db.Exec(strings.Replace(createTableTemplate, "${TABLENAME}", "pun", -1))
@@ -118,5 +108,18 @@ func init() {
 	_, err = db.Exec(strings.Replace(createTableTemplate, "${TABLENAME}", "psv", -1))
 	if err != nil {
 		fmt.Printf("Unable to create [psv] table: %v\n", err)
+	}
+
+	// tables need to be created before the prepared statements are created as they depend on them
+	fmt.Printf("Initializing prepared statements ...\n")
+
+	punEntryInsertStmt, err = db.Prepare(strings.Replace(insertEnergyCostTemplate, "${TABLENAME}", "pun", -1))
+	if err != nil {
+		fmt.Printf("Unable to create prepared stmt: %v\n", err)
+	}
+
+	psvEntryInsertStmt, err = db.Prepare(strings.Replace(insertEnergyCostTemplate, "${TABLENAME}", "psv", -1))
+	if err != nil {
+		fmt.Printf("Unable to create prepared stmt: %v\n", err)
 	}
 }
