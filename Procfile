@@ -1,0 +1,1 @@
+cron: bin/energy-cost-scraper
