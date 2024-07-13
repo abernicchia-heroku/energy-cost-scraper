@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
+	"net/smtp"
+	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +26,37 @@ const PunTableFullXpathDefault string = "/html/body/div[2]/div[2]/section[3]/div
 
 const EnergyCostPsvXpathEnv string = "ECS_ENERGYCOSTSCRAPER_PSV_XPATH"
 const PsvTableFullXpathDefault string = "/html/body/div[2]/div[2]/section[3]/div/div/div/div[2]/div[2]/div/div[2]/div/div[2]/div/div/div/div/div/div/div/table/tbody"
+
+const ReferencePunEnergyCostEnv string = "ECS_ENERGYCOSTSCRAPER_PUN_REFERENCE_COST"
+const ReferencePunEnergyCostDefault string = "0.11"
+
+const ReferencePsvEnergyCostEnv string = "ECS_ENERGYCOSTSCRAPER_PSV_REFERENCE_COST"
+const ReferencePsvEnergyCostDefault string = "0.39"
+
+const CloudMailInSmtpUrlEnv string = "CLOUDMAILIN_SMTP_URL"
+
+const MailFromEnv string = "ECS_ENERGYCOSTSCRAPER_MAIL_FROM"
+const MailFromDefault string = "bot@a16a.space"
+
+const MailToEnv string = "ECS_ENERGYCOSTSCRAPER_MAIL_TO"
+const MailToDefault string = "tmp@example.com"
+
+const mailMessageTemplate string = `
+To: {{.MailTo}}
+From: {{.MailFrom}}
+Subject: Energy Cost Scraper - {{.EnergyType}} market price getting lower!
+
+{{.EnergyType}} market price {{.MarketPrice}} is lower than your current bill price {{.BillPrice}} with a discount of {{.PercentageDiscount}}%, please look for alternative energy providers!
+`
+
+type MailInfo struct {
+	MailTo             string
+	MailFrom           string
+	EnergyType         string
+	MarketPrice        string
+	BillPrice          string
+	PercentageDiscount string
+}
 
 type EnergyCostEntryType int
 
@@ -93,11 +129,63 @@ func scrapeEnergyCost(htmldoc *html.Node, energyCostEntryType EnergyCostEntryTyp
 		}
 	}
 
-	if !newEntriesFound {
+	if newEntriesFound {
+		fmt.Printf("[main.go:scrapeEnergyCost] new cost entries found\n")
+
+		var refEnergyCost float64
+		if energyCostEntryType == EnergyCostEntryType_PUN {
+			refEnergyCost, _ = strconv.ParseFloat(getEnv(ReferencePunEnergyCostEnv, ReferencePunEnergyCostDefault), 64)
+		} else if energyCostEntryType == EnergyCostEntryType_PSV {
+			refEnergyCost, _ = strconv.ParseFloat(getEnv(ReferencePsvEnergyCostEnv, ReferencePsvEnergyCostDefault), 64)
+		}
+
+		// assuming that new inserted entries are greater (more recent) than those added previously (older)
+		earliestEnergyCostEntry := slices.MaxFunc(costEntries, func(a, b energyCostEntry) int {
+			return a.date.Compare(b.date)
+		})
+
+		// check if the earliest market price is lower than the reference paid price
+		if earliestEnergyCostEntry.cost < refEnergyCost {
+			sendMail(energyCostEntryType, earliestEnergyCostEntry, refEnergyCost)
+		}
+	} else {
 		fmt.Printf("[main.go:scrapeEnergyCost] no new cost entries found\n")
 	}
 
 	return costEntries, t
+}
+
+func sendMail(energyCostEntryType EnergyCostEntryType, earliestEnergyCostEntry energyCostEntry, refEnergyCost float64) {
+	// https://docs.cloudmailin.com/outbound/examples/send_email_with_golang/
+
+	u, err := url.Parse(getEnv(CloudMailInSmtpUrlEnv, ""))
+	if err != nil {
+		fmt.Printf("Invalid SMTP URL: %v\n", err)
+	} else {
+		// hostname is used by PlainAuth to validate the TLS certificate.
+		hostname := u.Hostname()
+		passwd, _ := u.User.Password()
+		auth := smtp.PlainAuth("", u.User.Username(), passwd, hostname)
+
+		mailInfo := MailInfo{getEnv(MailToEnv, MailToDefault), getEnv(MailFromEnv, MailFromDefault), energyCostEntryType.String(), fmt.Sprint(earliestEnergyCostEntry.cost), fmt.Sprint(refEnergyCost), fmt.Sprint((refEnergyCost - earliestEnergyCostEntry.cost) * 100 / earliestEnergyCostEntry.cost)}
+
+		tmpl, err := template.New("mailTemplate").Parse(mailMessageTemplate)
+		if err != nil {
+			panic(err)
+		}
+
+		var mailMsg bytes.Buffer
+		err = tmpl.Execute(&mailMsg, mailInfo)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("[main.go:scrapeEnergyCost] market price [%v EUR] is lower than current paid price [%v EUR], discount [%v%%], sending email alert ...\n", earliestEnergyCostEntry.cost, refEnergyCost, mailInfo.PercentageDiscount)
+		err = smtp.SendMail(hostname+":587", auth, mailInfo.MailFrom, []string{mailInfo.MailTo}, mailMsg.Bytes())
+		if err != nil {
+			fmt.Printf("Error sending email: %v\n", err)
+		}
+	}
 }
 
 func scrapeEnergyCostEntries(htmldoc *html.Node, xpath string) []energyCostEntry {
