@@ -33,10 +33,11 @@ const ReferencePunEnergyCostDefault string = "0.11"
 const ReferencePsvEnergyCostEnv string = "ECS_ENERGYCOSTSCRAPER_PSV_REFERENCE_COST"
 const ReferencePsvEnergyCostDefault string = "0.39"
 
-const CloudMailInSmtpUrlEnv string = "CLOUDMAILIN_SMTP_URL"
+const MailSmtpUrlEnv string = "ECS_ENERGYCOSTSCRAPER_SMTP_URL"
+const MailSmtpUrlDefault string = "smtp://user:password@hostname:port?starttls=true"
 
 const MailFromEnv string = "ECS_ENERGYCOSTSCRAPER_MAIL_FROM"
-const MailFromDefault string = "bot@a16a.space"
+const MailFromDefault string = "bot@example.com"
 
 const MailToEnv string = "ECS_ENERGYCOSTSCRAPER_MAIL_TO"
 const MailToDefault string = "tmp@example.com"
@@ -159,7 +160,7 @@ func scrapeEnergyCost(htmldoc *html.Node, energyCostEntryType EnergyCostEntryTyp
 func sendMail(energyCostEntryType EnergyCostEntryType, earliestEnergyCostEntry energyCostEntry, refEnergyCost float64) {
 	// https://docs.cloudmailin.com/outbound/examples/send_email_with_golang/
 
-	u, err := url.Parse(getEnv(CloudMailInSmtpUrlEnv, ""))
+	u, err := url.Parse(getEnv(MailSmtpUrlEnv, MailSmtpUrlDefault))
 	if err != nil {
 		fmt.Printf("Invalid SMTP URL: %v\n", err)
 	} else {
