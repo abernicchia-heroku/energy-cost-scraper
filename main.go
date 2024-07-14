@@ -42,8 +42,6 @@ const MailFromDefault string = "bot@example.com"
 const MailToEnv string = "ECS_ENERGYCOSTSCRAPER_MAIL_TO"
 const MailToDefault string = "tmp@example.com"
 
-// NOTE: with Tim.it SMTP provider, messages require to have \r\n as EOL otherwise "544 Message refused" error is raised. Moreover, unxpectedly '!' character after some characters throws the same error (!?!?) then it's better to break the line after about 150 chars
-// found using this snippet as test bench https://gist.github.com/jim3ma/b5c9edeac77ac92157f8f8affa290f45
 const mailMessageTemplate string = "" +
 	"To: {{.MailTo}}\r\n" +
 	"From: {{.MailFrom}}\r\n" +
