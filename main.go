@@ -41,13 +41,14 @@ const MailFromDefault string = "bot@a16a.space"
 const MailToEnv string = "ECS_ENERGYCOSTSCRAPER_MAIL_TO"
 const MailToDefault string = "tmp@example.com"
 
-const mailMessageTemplate string = `
-To: {{.MailTo}}
-From: {{.MailFrom}}
-Subject: Energy Cost Scraper - {{.EnergyType}} market price getting lower!
-
-{{.EnergyType}} market price {{.MarketPrice}} is lower than your current bill price {{.BillPrice}} with a discount of {{.PercentageDiscount}}%, please look for alternative energy providers!
-`
+// NOTE: with Tim.it SMTP provider, messages require to have \r\n as EOL otherwise "544 Message refused" error is raised. Moreover, unxpectedly '!' character after some characters throws the same error (!?!?) then it's better to break the line after about 150 chars
+// found using this snippet as test bench https://gist.github.com/jim3ma/b5c9edeac77ac92157f8f8affa290f45
+const mailMessageTemplate string = "" +
+	"To: {{.MailTo}}\r\n" +
+	"From: {{.MailFrom}}\r\n" +
+	"Subject: Energy Cost Scraper - {{.EnergyType}} market price getting lower!\r\n" +
+	"\r\n" +
+	"{{.EnergyType}} market price {{.MarketPrice}} EUR is lower than your current bill price {{.BillPrice}} EUR with a discount of {{.PercentageDiscount}}%\nPlease, look for alternative energy providers!"
 
 type MailInfo struct {
 	MailTo             string
@@ -167,7 +168,7 @@ func sendMail(energyCostEntryType EnergyCostEntryType, earliestEnergyCostEntry e
 		passwd, _ := u.User.Password()
 		auth := smtp.PlainAuth("", u.User.Username(), passwd, hostname)
 
-		mailInfo := MailInfo{getEnv(MailToEnv, MailToDefault), getEnv(MailFromEnv, MailFromDefault), energyCostEntryType.String(), fmt.Sprint(earliestEnergyCostEntry.cost), fmt.Sprint(refEnergyCost), fmt.Sprint((refEnergyCost - earliestEnergyCostEntry.cost) * 100 / earliestEnergyCostEntry.cost)}
+		mailInfo := MailInfo{getEnv(MailToEnv, MailToDefault), getEnv(MailFromEnv, MailFromDefault), strings.ToUpper(energyCostEntryType.String()), fmt.Sprint(earliestEnergyCostEntry.cost), fmt.Sprint(refEnergyCost), fmt.Sprint((refEnergyCost - earliestEnergyCostEntry.cost) * 100 / earliestEnergyCostEntry.cost)}
 
 		tmpl, err := template.New("mailTemplate").Parse(mailMessageTemplate)
 		if err != nil {
@@ -181,7 +182,7 @@ func sendMail(energyCostEntryType EnergyCostEntryType, earliestEnergyCostEntry e
 		}
 
 		fmt.Printf("[main.go:scrapeEnergyCost] market price [%v EUR] is lower than current paid price [%v EUR], discount [%v%%], sending email alert ...\n", earliestEnergyCostEntry.cost, refEnergyCost, mailInfo.PercentageDiscount)
-		err = smtp.SendMail(hostname+":587", auth, mailInfo.MailFrom, []string{mailInfo.MailTo}, mailMsg.Bytes())
+		err = smtp.SendMail(hostname+":"+u.Port(), auth, mailInfo.MailFrom, []string{mailInfo.MailTo}, mailMsg.Bytes())
 		if err != nil {
 			fmt.Printf("Error sending email: %v\n", err)
 		}
