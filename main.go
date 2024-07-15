@@ -236,10 +236,8 @@ func scrapeEnergyCostEntries(htmldoc *html.Node, xpath string) []energyCostEntry
 
 			for colIdx, column := range columns {
 				if colIdx == 0 {
-					//fmt.Printf("row(%d) column(%d) %s\n", rowIdx, colIdx, htmlquery.InnerText(column))
 					energyCostEntries[rowIdx-1].date = parseTime(htmlquery.InnerText(column))
 				} else if colIdx == 1 {
-					//fmt.Printf("row(%d) column(%d) %s\n", rowIdx, colIdx, htmlquery.InnerText(column))
 					energyCostEntries[rowIdx-1].cost, _ = strconv.ParseFloat(strings.Replace(string(htmlquery.InnerText(column)), ",", ".", -1), 64)
 				}
 			}
@@ -249,8 +247,6 @@ func scrapeEnergyCostEntries(htmldoc *html.Node, xpath string) []energyCostEntry
 	for _, energyCostEntry := range energyCostEntries {
 		fmt.Printf("%s %f\n", energyCostEntry.date, energyCostEntry.cost)
 	}
-
-	//fmt.Printf("%#v\n", energyCostEntries)
 
 	return energyCostEntries
 }
