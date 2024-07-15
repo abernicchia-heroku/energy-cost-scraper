@@ -36,6 +36,18 @@ const ReferencePsvEnergyCostDefault string = "0.39"
 const MailSmtpUrlEnv string = "ECS_ENERGYCOSTSCRAPER_SMTP_URL"
 const MailSmtpUrlDefault string = "smtp://user:password@hostname:port?starttls=true"
 
+const MailgunUserEnv string = "MAILGUN_SMTP_LOGIN"
+const MailgunUserDefault string = "mailgunuser"
+
+const MailgunPasswordEnv string = "MAILGUN_SMTP_PASSWORD"
+const MailgunPasswordDefault string = "mailgunpasswd"
+
+const MailgunSmtpPortEnv string = "MAILGUN_SMTP_PORT"
+const MailgunSmtpPortDefault string = "587"
+
+const MailgunSmtpHostnameEnv string = "MAILGUN_SMTP_SERVER"
+const MailgunSmtpHostnameDefault string = "mailgunhostname"
+
 const MailFromEnv string = "ECS_ENERGYCOSTSCRAPER_MAIL_FROM"
 const MailFromDefault string = "bot@example.com"
 
@@ -156,12 +168,25 @@ func scrapeEnergyCost(htmldoc *html.Node, energyCostEntryType EnergyCostEntryTyp
 }
 
 func sendMail(energyCostEntryType EnergyCostEntryType, earliestEnergyCostEntry energyCostEntry, refEnergyCost float64) {
-	// https://docs.cloudmailin.com/outbound/examples/send_email_with_golang/
+	// by default it's expected to work with Mailgun add-on, but it's possible to override the smtp URL with the MailSmtpUrlEnv
 
-	u, err := url.Parse(getEnv(MailSmtpUrlEnv, MailSmtpUrlDefault))
+	var mailSmtpUrl string
+	if isEnv(MailSmtpUrlEnv) {
+		fmt.Printf("Using external SMTP service to send emails\n")
+
+		mailSmtpUrl = getEnv(MailSmtpUrlEnv, MailSmtpUrlDefault)
+	} else {
+		fmt.Printf("Using Mailgun to send emails\n")
+
+		mailSmtpUrl = fmt.Sprintf("smtp://%s:%s@%s:%s?starttls=true", getEnv(MailgunUserEnv, MailgunUserDefault), getEnv(MailgunPasswordEnv, MailgunPasswordDefault), getEnv(MailgunSmtpHostnameEnv, MailgunSmtpHostnameDefault), getEnv(MailgunSmtpPortEnv, MailgunSmtpPortDefault))
+	}
+
+	u, err := url.Parse(mailSmtpUrl)
 	if err != nil {
 		fmt.Printf("Invalid SMTP URL: %v\n", err)
 	} else {
+		// https://docs.cloudmailin.com/outbound/examples/send_email_with_golang/
+
 		// hostname is used by PlainAuth to validate the TLS certificate.
 		hostname := u.Hostname()
 		passwd, _ := u.User.Password()
