@@ -219,6 +219,11 @@ func scrapeEnergyCostEntries(htmldoc *html.Node, xpath string) []energyCostEntry
 		panic(err)
 	}
 
+	if table == nil {
+		fmt.Printf("Table not found: %s\n", xpath)
+		panic("xpath not found, check if the source page was modified")
+	}
+
 	rows, err := htmlquery.QueryAll(table, "//tr")
 	if err != nil {
 		panic(err)

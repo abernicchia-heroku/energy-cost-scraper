@@ -1,6 +1,6 @@
 module energy-cost-scraper
 
-go 1.22
+go 1.24.2
 
 require (
 	github.com/antchfx/htmlquery v1.3.1
