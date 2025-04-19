@@ -22,7 +22,7 @@ const EnergyCostSiteUrlEnv string = "ECS_ENERGYCOSTSCRAPER_SITEURL"
 const EnergyCostSiteUrlDefault string = "https://www.acea.it/tariffe-indici"
 
 const EnergyCostPunXpathEnv string = "ECS_ENERGYCOSTSCRAPER_PUN_XPATH"
-const PunTableFullXpathDefault string = "/html/body/div[2]/div[2]/section[3]/div/div/div/div[2]/div[2]/div/div[1]/div/div[2]/div/div/div/div/div/div/div[2]/table/tbody"
+const PunTableFullXpathDefault string = "/html/body/div[2]/div[2]/section[3]/div/div/div/div[2]/div[2]/div/div[1]/div/div[2]/div/div/div/div/div/div/div/table/tbody"
 
 const EnergyCostPsvXpathEnv string = "ECS_ENERGYCOSTSCRAPER_PSV_XPATH"
 const PsvTableFullXpathDefault string = "/html/body/div[2]/div[2]/section[3]/div/div/div/div[2]/div[2]/div/div[2]/div/div[2]/div/div/div/div/div/div/div/table/tbody"
